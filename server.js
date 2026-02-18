@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -8,6 +9,9 @@ const server = http.createServer(app);
 // Essential for parsing the JSON data from your Login/Signup forms
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files (like index.html, css, client-side js) from the root directory
+app.use(express.static(__dirname));
 
 // Temporary in-memory database (Resets when server restarts)
 const users = {}; 
@@ -19,6 +23,12 @@ const io = new Server(server, {
     origin: "*", 
     methods: ["GET", "POST"]
   }
+});
+
+// --- ROOT ROUTE ---
+// This fixes the "Cannot GET /" error by serving your index.html file
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // --- AUTHENTICATION ROUTES ---
