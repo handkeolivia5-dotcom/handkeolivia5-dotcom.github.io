@@ -5,26 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My MMO</title>
     <style>
-        body { margin: 0; background: #222; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .screen { display: none; flex-direction: column; gap: 10px; background: #333; padding: 20px; border-radius: 8px; width: 300px; }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .screen { display: none; flex-direction: column; gap: 15px; background: #2a2a2a; padding: 30px; border-radius: 12px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #444; }
         .active { display: flex; }
-        input, button { padding: 10px; border-radius: 4px; border: none; }
-        button { background: #4CAF50; color: white; cursor: pointer; }
+        h2 { margin: 0 0 10px 0; text-align: center; color: #4CAF50; }
+        input, button { padding: 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: white; outline: none; }
+        input:focus { border-color: #4CAF50; }
+        button { background: #4CAF50; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #45a049; }
-        .server-card { background: #444; padding: 10px; cursor: pointer; border: 1px solid #555; }
-        .server-card:hover { border-color: #4CAF50; }
+        .secondary-btn { background: #444; margin-top: 5px; }
+        .secondary-btn:hover { background: #555; }
+        .server-card { background: #333; padding: 15px; cursor: pointer; border: 2px solid transparent; border-radius: 8px; transition: 0.2s; }
+        .server-card:hover { border-color: #4CAF50; background: #383838; }
+        #message-box { font-size: 0.9em; text-align: center; min-height: 1.2em; }
+        .error { color: #ff5555; }
+        .success { color: #55ff55; }
+        #gameCanvas { background: #000; width: 100%; height: 100%; border-radius: 4px; }
     </style>
 </head>
 <body>
 
+    <!-- 1. Auth Screen -->
     <div id="auth-screen" class="screen active">
-        <h2>Welcome Survivor</h2>
+        <h2 id="auth-title">Login</h2>
+        <div id="message-box"></div>
+        
         <input type="text" id="username" placeholder="Username">
+        <!-- Email field only shown during Signup -->
+        <input type="email" id="email" placeholder="Email Address" style="display: none;">
         <input type="password" id="password" placeholder="Password">
-        <button onclick="handleAuth('login')">Login</button>
-        <button style="background:#555" onclick="handleAuth('signup')">Sign Up</button>
+        
+        <button id="primary-auth-btn" onclick="performAuth()">Login</button>
+        <button class="secondary-btn" id="toggle-auth-btn" onclick="toggleAuthMode()">Need an account? Sign Up</button>
     </div>
 
+    <!-- 2. Server Selection Screen -->
     <div id="server-screen" class="screen">
         <h2>Select a Server</h2>
         <div class="server-card" onclick="joinServer('https://your-render-url.onrender.com')">
@@ -37,39 +52,120 @@
         </div>
     </div>
 
-    <div id="game-screen" class="screen" style="width: 80vw; height: 80vh;">
+    <!-- 3. The Game Canvas -->
+    <div id="game-screen" class="screen" style="width: 90vw; height: 90vh;">
         <canvas id="gameCanvas"></canvas>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
+        let isSignupMode = false;
+        const RENDER_URL = "https://your-render-url.onrender.com"; // REPLACE THIS with your actual URL
+
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
         }
 
-        async function handleAuth(type) {
-            // For now, we'll simulate a successful login
-            // Later, you'll fetch() to your Render server's login endpoint
-            console.log(`${type} attempt...`);
-            showScreen('server-screen');
+        function toggleAuthMode() {
+            isSignupMode = !isSignupMode;
+            const title = document.getElementById('auth-title');
+            const emailInput = document.getElementById('email');
+            const primaryBtn = document.getElementById('primary-auth-btn');
+            const toggleBtn = document.getElementById('toggle-auth-btn');
+            const msgBox = document.getElementById('message-box');
+
+            msgBox.innerText = "";
+            if (isSignupMode) {
+                title.innerText = "Sign Up";
+                emailInput.style.display = "block";
+                primaryBtn.innerText = "Create Account";
+                toggleBtn.innerText = "Already have an account? Login";
+            } else {
+                title.innerText = "Login";
+                emailInput.style.display = "none";
+                primaryBtn.innerText = "Login";
+                toggleBtn.innerText = "Need an account? Sign Up";
+            }
+        }
+
+        async function performAuth() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value;
+            const msgBox = document.getElementById('message-box');
+            
+            const endpoint = isSignupMode ? '/signup' : '/login';
+            const payload = { username, password };
+            if (isSignupMode) payload.email = email;
+
+            msgBox.innerText = "Connecting...";
+            msgBox.className = "";
+
+            try {
+                const response = await fetch(`${RENDER_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    msgBox.className = "success";
+                    msgBox.innerText = data.message;
+                    setTimeout(() => showScreen('server-screen'), 1000);
+                } else {
+                    msgBox.className = "error";
+                    msgBox.innerText = data.message;
+                }
+            } catch (err) {
+                msgBox.className = "error";
+                msgBox.innerText = "Server connection failed.";
+                console.error(err);
+            }
         }
 
         function joinServer(url) {
-            console.log("Connecting to:", url);
+            console.log("Connecting to world...");
             const socket = io(url);
+            const username = document.getElementById('username').value;
 
             socket.on('connect', () => {
                 showScreen('game-screen');
+                socket.emit('join-game', username);
                 initGame(socket);
+            });
+
+            socket.on('connect_error', () => {
+                alert("Failed to connect to game server.");
             });
         }
 
         function initGame(socket) {
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            console.log("Game loop started!");
-            // Drawing logic goes here
+            
+            // Basic Responsive Canvas
+            function resize() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+            window.onresize = resize;
+            resize();
+
+            function draw() {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#4CAF50';
+                ctx.font = "20px Arial";
+                ctx.fillText("Connected as: " + socket.id, 20, 40);
+                ctx.fillText("World rendering starting soon...", 20, 80);
+                
+                requestAnimationFrame(draw);
+            }
+            draw();
         }
     </script>
 </body>
