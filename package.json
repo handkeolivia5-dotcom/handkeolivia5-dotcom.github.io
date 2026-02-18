@@ -1,11 +1,23 @@
 {
   "name": "mmo-server",
   "version": "1.0.0",
+  "description": "MMO Server with Firebase Authentication",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 0"
   },
+  "keywords": [
+    "mmo",
+    "socket.io",
+    "firebase",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
+    "firebase-admin": "^12.0.0",
     "socket.io": "^4.7.5"
   }
 }
