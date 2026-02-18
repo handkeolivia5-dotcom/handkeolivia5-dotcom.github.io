@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My MMO</title>
+    <style>
+        body { margin: 0; background: #222; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .screen { display: none; flex-direction: column; gap: 10px; background: #333; padding: 20px; border-radius: 8px; width: 300px; }
+        .active { display: flex; }
+        input, button { padding: 10px; border-radius: 4px; border: none; }
+        button { background: #4CAF50; color: white; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .server-card { background: #444; padding: 10px; cursor: pointer; border: 1px solid #555; }
+        .server-card:hover { border-color: #4CAF50; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" class="screen active">
+        <h2>Welcome Survivor</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="handleAuth('login')">Login</button>
+        <button style="background:#555" onclick="handleAuth('signup')">Sign Up</button>
+    </div>
+
+    <div id="server-screen" class="screen">
+        <h2>Select a Server</h2>
+        <div class="server-card" onclick="joinServer('https://your-render-url.onrender.com')">
+            <strong>North America (Live)</strong><br>
+            <small>Status: Online</small>
+        </div>
+        <div class="server-card" style="opacity: 0.5; cursor: not-allowed;">
+            <strong>Europe</strong><br>
+            <small>Status: Coming Soon</small>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen" style="width: 80vw; height: 80vh;">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        async function handleAuth(type) {
+            // For now, we'll simulate a successful login
+            // Later, you'll fetch() to your Render server's login endpoint
+            console.log(`${type} attempt...`);
+            showScreen('server-screen');
+        }
+
+        function joinServer(url) {
+            console.log("Connecting to:", url);
+            const socket = io(url);
+
+            socket.on('connect', () => {
+                showScreen('game-screen');
+                initGame(socket);
+            });
+        }
+
+        function initGame(socket) {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            console.log("Game loop started!");
+            // Drawing logic goes here
+        }
+    </script>
+</body>
+</html>
