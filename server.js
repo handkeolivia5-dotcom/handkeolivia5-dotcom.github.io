@@ -1,15 +1,28 @@
-import { Server } from "socket.io";
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 
-const io = new Server(3000, { cors: { origin: "*" } });
+const app = express();
+const server = http.createServer(app);
 
-io.on("connection", (socket) => {
-  console.log("A player connected:", socket.id);
+// Use the PORT Render provides, or 3000 locally
+const PORT = process.env.PORT || 3000;
 
-  socket.on("move", (data) => {
-    // Validate movement here
-    // Broadcast to others
-    socket.broadcast.emit("playerMoved", { id: socket.id, pos: data.pos });
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Allows your GitHub Pages site to connect
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
   });
 });
 
-console.log("MMO Server running on port 3000");
+server.listen(PORT, () => {
+  console.log(`MMO Server live on port ${PORT}`);
+});
