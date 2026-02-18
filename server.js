@@ -11,7 +11,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (like index.html, css, client-side js) from the root directory
-app.use(express.static(__dirname));
+// Using path.join helps avoid issues with relative paths on different operating systems
+app.use(express.static(path.join(__dirname)));
 
 // Temporary in-memory database (Resets when server restarts)
 const users = {}; 
@@ -26,9 +27,15 @@ const io = new Server(server, {
 });
 
 // --- ROOT ROUTE ---
-// This fixes the "Cannot GET /" error by serving your index.html file
+// This explicitly sends the index.html file. 
+// If this still fails, ensure index.html is in the SAME folder as server.js on GitHub.
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+        if (err) {
+            console.error("Error sending index.html. Is the file in the root directory?");
+            res.status(404).send("index.html not found on server.");
+        }
+    });
 });
 
 // --- AUTHENTICATION ROUTES ---
@@ -74,4 +81,5 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`MMO Server live on port ${PORT}`);
+  console.log(`Searching for index.html in: ${path.join(__dirname, 'index.html')}`);
 });
