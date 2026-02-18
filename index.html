@@ -42,11 +42,10 @@
     <!-- 2. Server Selection Screen -->
     <div id="server-screen" class="screen">
         <h2>Select a Server</h2>
-        <div class="server-card" onclick="joinServer('https://your-render-url.onrender.com')">
-            <strong>North America (Live)</strong><br>
-            <small>Status: Online</small>
+        <div id="server-list">
+            <!-- Server cards will be initialized with the RENDER_URL below -->
         </div>
-        <div class="server-card" style="opacity: 0.5; cursor: not-allowed;">
+        <div class="server-card" style="opacity: 0.5; cursor: not-allowed; margin-top: 10px;">
             <strong>Europe</strong><br>
             <small>Status: Coming Soon</small>
         </div>
@@ -60,7 +59,19 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         let isSignupMode = false;
-        const RENDER_URL = "https://your-render-url.onrender.com"; // REPLACE THIS with your actual URL
+        
+        // --- CONFIGURATION ---
+        // IMPORTANT: Ensure this URL is correct and starts with https://
+        // Remove any trailing slash at the end of the URL.
+        const RENDER_URL = "https://your-render-url.onrender.com"; 
+
+        // Initialize Server List UI
+        document.getElementById('server-list').innerHTML = `
+            <div class="server-card" onclick="joinServer('${RENDER_URL}')">
+                <strong>North America (Live)</strong><br>
+                <small>Status: Online</small>
+            </div>
+        `;
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -95,15 +106,29 @@
             const email = document.getElementById('email').value;
             const msgBox = document.getElementById('message-box');
             
+            if (!username || !password || (isSignupMode && !email)) {
+                msgBox.className = "error";
+                msgBox.innerText = "Please fill in all fields.";
+                return;
+            }
+
+            if (RENDER_URL.includes("your-render-url")) {
+                msgBox.className = "error";
+                msgBox.innerText = "Error: Update RENDER_URL in code.";
+                return;
+            }
+
             const endpoint = isSignupMode ? '/signup' : '/login';
             const payload = { username, password };
             if (isSignupMode) payload.email = email;
 
-            msgBox.innerText = "Connecting...";
+            msgBox.innerText = "Connecting to server...";
             msgBox.className = "";
 
             try {
-                const response = await fetch(`${RENDER_URL}${endpoint}`, {
+                // Ensure no double slashes if RENDER_URL had a trailing one
+                const cleanUrl = RENDER_URL.replace(/\/$/, "");
+                const response = await fetch(`${cleanUrl}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -121,13 +146,15 @@
                 }
             } catch (err) {
                 msgBox.className = "error";
-                msgBox.innerText = "Server connection failed.";
-                console.error(err);
+                msgBox.innerText = "Failed to connect. Is the server awake?";
+                console.error("Fetch Error Detail:", err);
             }
         }
 
         function joinServer(url) {
+            const msgBox = document.getElementById('message-box');
             console.log("Connecting to world...");
+            
             const socket = io(url);
             const username = document.getElementById('username').value;
 
@@ -137,8 +164,9 @@
                 initGame(socket);
             });
 
-            socket.on('connect_error', () => {
-                alert("Failed to connect to game server.");
+            socket.on('connect_error', (err) => {
+                alert("Connection failed. The server might be booting up. Please try again in 30 seconds.");
+                console.error("Socket Error:", err);
             });
         }
 
@@ -146,7 +174,6 @@
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             
-            // Basic Responsive Canvas
             function resize() {
                 canvas.width = canvas.parentElement.clientWidth;
                 canvas.height = canvas.parentElement.clientHeight;
