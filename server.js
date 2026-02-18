@@ -55,7 +55,7 @@ app.get('/', (req, res) => {
 // --- AUTHENTICATION ROUTES (FIREBASE) ---
 
 app.post('/signup', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
     try {
         const userRef = db.collection('users').doc(username);
         const doc = await userRef.get();
@@ -66,11 +66,12 @@ app.post('/signup', async (req, res) => {
 
         await userRef.set({
             username,
+            email,
             password, // In a real app, always hash passwords before saving!
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        console.log(`New user registered in Firestore: ${username}`);
+        console.log(`New user registered in Firestore: ${username} (${email})`);
         res.json({ success: true, message: "Account created in Firebase!" });
     } catch (error) {
         console.error("Signup error:", error);
