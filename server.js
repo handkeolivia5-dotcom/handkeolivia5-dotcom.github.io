@@ -2,20 +2,36 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
+const admin = require('firebase-admin');
 
 const app = express();
 const server = http.createServer(app);
+
+// --- FIREBASE INITIALIZATION ---
+// Note: In a production environment, you should use a Service Account JSON file.
+// For now, we initialize with the project ID provided.
+const firebaseConfig = {
+  apiKey: "AIzaSyBsssUACmo85xvCif7no6oOxU1grVe5WPQ",
+  authDomain: "projectmmo-e0027.firebaseapp.com",
+  projectId: "projectmmo-e0027",
+  storageBucket: "projectmmo-e0027.firebasestorage.app",
+  messagingSenderId: "82809636398",
+  appId: "1:82809636398:web:656141c6b87013089a41bf",
+  measurementId: "G-SPLCPDG59C"
+};
+
+admin.initializeApp({
+  projectId: firebaseConfig.projectId
+});
+
+const db = admin.firestore();
 
 // Essential for parsing the JSON data from your Login/Signup forms
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files (like index.html, css, client-side js) from the root directory
-// Using path.join helps avoid issues with relative paths on different operating systems
+// Serve static files from the root directory
 app.use(express.static(path.join(__dirname)));
-
-// Temporary in-memory database (Resets when server restarts)
-const users = {}; 
 
 const PORT = process.env.PORT || 3000;
 
@@ -27,8 +43,6 @@ const io = new Server(server, {
 });
 
 // --- ROOT ROUTE ---
-// This explicitly sends the index.html file. 
-// If this still fails, ensure index.html is in the SAME folder as server.js on GitHub.
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'), (err) => {
         if (err) {
@@ -38,25 +52,46 @@ app.get('/', (req, res) => {
     });
 });
 
-// --- AUTHENTICATION ROUTES ---
+// --- AUTHENTICATION ROUTES (FIREBASE) ---
 
-app.post('/signup', (req, res) => {
+app.post('/signup', async (req, res) => {
     const { username, password } = req.body;
-    if (users[username]) {
-        return res.status(400).json({ success: false, message: "User already exists" });
+    try {
+        const userRef = db.collection('users').doc(username);
+        const doc = await userRef.get();
+
+        if (doc.exists) {
+            return res.status(400).json({ success: false, message: "User already exists" });
+        }
+
+        await userRef.set({
+            username,
+            password, // In a real app, always hash passwords before saving!
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log(`New user registered in Firestore: ${username}`);
+        res.json({ success: true, message: "Account created in Firebase!" });
+    } catch (error) {
+        console.error("Signup error:", error);
+        res.status(500).json({ success: false, message: "Database error" });
     }
-    users[username] = { password, id: Math.random().toString(36).substr(2, 9) };
-    console.log(`New user registered: ${username}`);
-    res.json({ success: true, message: "Account created!" });
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
     const { username, password } = req.body;
-    const user = users[username];
-    if (user && user.password === password) {
-        res.json({ success: true, message: "Logged in successfully" });
-    } else {
-        res.status(401).json({ success: false, message: "Invalid username or password" });
+    try {
+        const userRef = db.collection('users').doc(username);
+        const doc = await userRef.get();
+
+        if (doc.exists && doc.data().password === password) {
+            res.json({ success: true, message: "Logged in successfully" });
+        } else {
+            res.status(401).json({ success: false, message: "Invalid username or password" });
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ success: false, message: "Database error" });
     }
 });
 
@@ -65,12 +100,9 @@ app.post('/login', (req, res) => {
 io.on('connection', (socket) => {
   console.log('User connected to game world:', socket.id);
 
-  // Handle player joining after server selection
   socket.on('join-game', (username) => {
       console.log(`${username} has entered the world.`);
-      // You can store the username on the socket for later use
       socket.username = username;
-      // Broadcast to others that a player joined
       socket.broadcast.emit('player-joined', { id: socket.id, name: username });
   });
 
