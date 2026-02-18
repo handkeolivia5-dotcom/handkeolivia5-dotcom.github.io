@@ -5,18 +5,57 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Use the PORT Render provides, or 3000 locally
+// Essential for parsing the JSON data from your Login/Signup forms
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Temporary in-memory database (Resets when server restarts)
+const users = {}; 
+
 const PORT = process.env.PORT || 3000;
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allows your GitHub Pages site to connect
+    origin: "*", 
     methods: ["GET", "POST"]
   }
 });
 
+// --- AUTHENTICATION ROUTES ---
+
+app.post('/signup', (req, res) => {
+    const { username, password } = req.body;
+    if (users[username]) {
+        return res.status(400).json({ success: false, message: "User already exists" });
+    }
+    users[username] = { password, id: Math.random().toString(36).substr(2, 9) };
+    console.log(`New user registered: ${username}`);
+    res.json({ success: true, message: "Account created!" });
+});
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const user = users[username];
+    if (user && user.password === password) {
+        res.json({ success: true, message: "Logged in successfully" });
+    } else {
+        res.status(401).json({ success: false, message: "Invalid username or password" });
+    }
+});
+
+// --- SOCKET.IO LOGIC ---
+
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('User connected to game world:', socket.id);
+
+  // Handle player joining after server selection
+  socket.on('join-game', (username) => {
+      console.log(`${username} has entered the world.`);
+      // You can store the username on the socket for later use
+      socket.username = username;
+      // Broadcast to others that a player joined
+      socket.broadcast.emit('player-joined', { id: socket.id, name: username });
+  });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
