@@ -8,29 +8,28 @@ const app = express();
 const server = http.createServer(app);
 
 // --- FIREBASE INITIALIZATION ---
-// Note: In a production environment, you should use a Service Account JSON file.
-// For now, we initialize with the project ID provided.
+// Note: For Render/Production, you should eventually use a Service Account JSON.
+// Using just the ProjectID requires the environment to have default credentials.
 const firebaseConfig = {
-  apiKey: "AIzaSyBsssUACmo85xvCif7no6oOxU1grVe5WPQ",
-  authDomain: "projectmmo-e0027.firebaseapp.com",
-  projectId: "projectmmo-e0027",
-  storageBucket: "projectmmo-e0027.firebasestorage.app",
-  messagingSenderId: "82809636398",
-  appId: "1:82809636398:web:656141c6b87013089a41bf",
-  measurementId: "G-SPLCPDG59C"
+  projectId: "projectmmo-e0027"
 };
 
-admin.initializeApp({
-  projectId: firebaseConfig.projectId
-});
+try {
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            projectId: firebaseConfig.projectId
+        });
+        console.log("Firebase Admin initialized successfully.");
+    }
+} catch (e) {
+    console.error("Firebase initialization failed:", e);
+}
 
 const db = admin.firestore();
 
-// Essential for parsing the JSON data from your Login/Signup forms
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve static files from the root directory
 app.use(express.static(path.join(__dirname)));
 
 const PORT = process.env.PORT || 3000;
@@ -42,40 +41,45 @@ const io = new Server(server, {
   }
 });
 
-// --- ROOT ROUTE ---
+// Root Route
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'), (err) => {
-        if (err) {
-            console.error("Error sending index.html. Is the file in the root directory?");
-            res.status(404).send("index.html not found on server.");
-        }
-    });
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- AUTHENTICATION ROUTES (FIREBASE) ---
+// --- AUTHENTICATION ROUTES ---
 
 app.post('/signup', async (req, res) => {
     const { username, email, password } = req.body;
+    
+    // Server-side validation
+    if (!username || !email || !password) {
+        return res.status(400).json({ success: false, message: "All fields are required." });
+    }
+
     try {
+        console.log(`Attempting signup for: ${username}`);
         const userRef = db.collection('users').doc(username);
         const doc = await userRef.get();
 
         if (doc.exists) {
-            return res.status(400).json({ success: false, message: "User already exists" });
+            return res.status(400).json({ success: false, message: "Username already taken." });
         }
 
         await userRef.set({
             username,
             email,
-            password, // In a real app, always hash passwords before saving!
+            password, 
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        console.log(`New user registered in Firestore: ${username} (${email})`);
-        res.json({ success: true, message: "Account created in Firebase!" });
+        res.json({ success: true, message: "Account created!" });
     } catch (error) {
-        console.error("Signup error:", error);
-        res.status(500).json({ success: false, message: "Database error" });
+        // This will show up in your Render Logs
+        console.error("FIREBASE ERROR:", error.message);
+        res.status(500).json({ 
+            success: false, 
+            message: "Database Error: " + error.message 
+        });
     }
 });
 
@@ -86,33 +90,24 @@ app.post('/login', async (req, res) => {
         const doc = await userRef.get();
 
         if (doc.exists && doc.data().password === password) {
-            res.json({ success: true, message: "Logged in successfully" });
+            res.json({ success: true, message: "Welcome back!" });
         } else {
-            res.status(401).json({ success: false, message: "Invalid username or password" });
+            res.status(401).json({ success: false, message: "Invalid credentials." });
         }
     } catch (error) {
-        console.error("Login error:", error);
-        res.status(500).json({ success: false, message: "Database error" });
+        console.error("LOGIN ERROR:", error.message);
+        res.status(500).json({ success: false, message: "Login failed." });
     }
 });
 
-// --- SOCKET.IO LOGIC ---
-
+// --- SOCKETS ---
 io.on('connection', (socket) => {
-  console.log('User connected to game world:', socket.id);
-
   socket.on('join-game', (username) => {
-      console.log(`${username} has entered the world.`);
       socket.username = username;
       socket.broadcast.emit('player-joined', { id: socket.id, name: username });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`MMO Server live on port ${PORT}`);
-  console.log(`Searching for index.html in: ${path.join(__dirname, 'index.html')}`);
+  console.log(`Server listening on port ${PORT}`);
 });
