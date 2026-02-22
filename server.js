@@ -8,8 +8,6 @@ const app = express();
 const server = http.createServer(app);
 
 // --- FIREBASE INITIALIZATION ---
-// Note: For Render/Production, you should eventually use a Service Account JSON.
-// Using just the ProjectID requires the environment to have default credentials.
 const firebaseConfig = {
   projectId: "projectmmo-e0027"
 };
@@ -41,17 +39,12 @@ const io = new Server(server, {
   }
 });
 
-// Root Route
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// --- ROUTES ---
 
-// --- AUTHENTICATION ROUTES ---
-
+// Authentication logic (POST)
 app.post('/signup', async (req, res) => {
     const { username, email, password } = req.body;
     
-    // Server-side validation
     if (!username || !email || !password) {
         return res.status(400).json({ success: false, message: "All fields are required." });
     }
@@ -74,7 +67,6 @@ app.post('/signup', async (req, res) => {
 
         res.json({ success: true, message: "Account created!" });
     } catch (error) {
-        // This will show up in your Render Logs
         console.error("FIREBASE ERROR:", error.message);
         res.status(500).json({ 
             success: false, 
@@ -98,6 +90,13 @@ app.post('/login', async (req, res) => {
         console.error("LOGIN ERROR:", error.message);
         res.status(500).json({ success: false, message: "Login failed." });
     }
+});
+
+// Wildcard Route (GET)
+// This ensures that visiting /login or refreshing the page returns index.html
+// instead of a "Cannot GET" error.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // --- SOCKETS ---
